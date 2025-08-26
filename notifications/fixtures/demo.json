@@ -1,0 +1,11 @@
+[
+  {
+    "model": "notifications.user",
+    "pk": 1,
+    "fields": {
+      "email": "demo@example.com",
+      "phone": "+79001234567",
+      "telegram_id": "123456789"
+    }
+  }
+]

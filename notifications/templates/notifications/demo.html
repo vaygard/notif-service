@@ -1,0 +1,108 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Уведомления — Демонстрация</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 24px; }
+    .wrap { max-width: 900px; margin: 0 auto; }
+    h1 { margin-bottom: 8px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    form { border: 1px solid #ddd; border-radius: 8px; padding: 16px; }
+    label { display: block; font-weight: 600; margin-top: 8px; }
+    input, textarea, select { width: 100%; padding: 8px; margin-top: 4px; }
+    button { margin-top: 12px; padding: 8px 12px; cursor: pointer; }
+    .messages { margin: 12px 0; }
+    .msg { padding: 10px 12px; border-radius: 6px; margin-bottom: 8px; }
+    .msg.success { background: #e9f7ef; border: 1px solid #b7ebc6; }
+    .msg.error { background: #fff2f0; border: 1px solid #ffccc7; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { border: 1px solid #eee; padding: 8px; }
+    th { text-align: left; background: #fafafa; }
+    small { color: #666; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Система уведомлений — демо</h1>
+  <p>Создай пользователя, затем отправь ему уведомление. (fallback).</p>
+
+  <div class="messages">
+    {% for m in messages %}
+      <div class="msg {{ m.tags }}">{{ m }}</div>
+    {% endfor %}
+  </div>
+
+  <div class="grid">
+    <!-- Форма создания пользователя -->
+    <form method="post" action="{% url 'create-user' %}">
+      {% csrf_token %}
+      <h2>1) Создать пользователя</h2>
+      <label>Email</label>
+      <input type="email" name="email" placeholder="me@example.com" />
+      <label>Телефон</label>
+      <input type="text" name="phone" placeholder="+79001234567" />
+      <label>Telegram ID</label>
+      <input type="text" name="telegram_id" placeholder="123456789" />
+      <small>Можно указать один или несколько контактов. Достаточно одного канала.</small>
+      <button type="submit">Создать</button>
+    </form>
+
+    <!-- Форма отправки уведомления -->
+    <form method="post" action="{% url 'send-notification' %}">
+      {% csrf_token %}
+      <h2>2) Отправить уведомление</h2>
+      <label>ID пользователя</label>
+      <input type="number" name="user_id" placeholder="например, 1" required />
+      <label>Сообщение</label>
+      <textarea name="message" rows="5" placeholder="Текст уведомления..." required></textarea>
+      <button type="submit">Отправить</button>
+      <p><small>После отправки обнови страницу — ниже появится запись в таблице уведомлений.</small></p>
+    </form>
+  </div>
+
+  <!-- Таблица последних пользователей -->
+  <h2>Пользователи (последние 10)</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Email</th><th>Телефон</th><th>Telegram ID</th></tr></thead>
+    <tbody>
+      {% for u in users %}
+        <tr>
+          <td>{{ u.id }}</td>
+          <td>{{ u.email }}</td>
+          <td>{{ u.phone }}</td>
+          <td>{{ u.telegram_id }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4">Пока нет пользователей.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Таблица последних уведомлений -->
+  <h2>Уведомления (последние 10)</h2>
+  <table>
+    <thead><tr><th>ID</th><th>User</th><th>Message</th><th>Delivered</th><th>Method</th><th>Attempts</th><th>Created</th></tr></thead>
+    <tbody>
+      {% for n in notifs %}
+        <tr>
+          <td>{{ n.id }}</td>
+          <td>{{ n.user.id }}</td>
+          <td>{{ n.message|truncatechars:60 }}</td>
+          <td>{{ n.delivered }}</td>
+          <td>{{ n.delivery_method }}</td>
+          <td>{{ n.attempts }}</td>
+          <td>{{ n.created_at }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7">Пока нет уведомлений.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  
+</div>
+</body>
+</html>
