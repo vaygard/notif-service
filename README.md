@@ -1,6 +1,6 @@
 
 # Система уведомлений (Email → SMS → Telegram с fallback)
-## !!Тестовое задание!!
+
 Мини-сервис на Django + DRF + Celery + Redis. Отправляет уведомления пользователям по цепочке: сначала Email, затем SMS, затем Telegram. Если канал недоступен, пробует следующий. Есть простая HTML-страница для ручной проверки, REST API и скрипты запуска для Windows.
 
 ## Стек
@@ -21,44 +21,48 @@
 - REST API: создание пользователя и постановка уведомления в очередь.
     
 - Конфигурация через `.env`. Быстрый dev-режим без Redis (eager).
-## Быстрый старт (Windows, PowerShell)
-1) Клонирование и переход в папку проекта
-git clone <repo-url>
-cd <repo-folder>
-	
-1) Запуск «всё-в-одном»
-по умолчанию: SQLite, загрузка фикстуры, Celery-воркер и runserver
- .\run.ps1 -Open
-Откроется `http://127.0.0.1:8000/` — демо-страница с формами:
-2. создать пользователя,
-3. отправить уведомление.
-Если нужно «без Redis/воркера», для локального теста:
-.\run.ps1 -Eager -Open
-В этом режиме Celery-задачи выполняются синхронно в том же процессе.
-Остановка процессов:
-.\stop.ps1
-Ручной запуск
- venv
-python -m venv .venv
-	.\.venv\Scripts\Activate.ps1
-	python -m pip install --upgrade pip
-	pip install -r requirements.txt
-	
- .env
-	copy .env.example .env    # отредактируйте при необходимости
+## Отправка через Email (SMTP)
+Реализована отправка писем через `smtplib`. Нужны:
+1. **Почтовый ящик** (поддерживаемый SMTP).  
+2. **App Password** (пароль приложения).  
 
-4. миграции и (опц.) фикстуры
- миграции и (опц.) фикстуры
-python manage.py migrate
-python manage.py loaddata notifications/fixtures/demo.json
-	
-5. вариант A: dev без Redis (синхронно)
- вариант A: dev без Redis (синхронно)
-в .env: CELERY_TASK_ALWAYS_EAGER=1
-python manage.py runserver
-	
-6. вариант B: асинхронно с Redis
- вариант B: асинхронно с Redis
-в .env: CELERY_TASK_ALWAYS_EAGER=0, REDIS_URL=redis://127.0.0.1:6379/0
-redis-server   # или убедитесь, что сервис Redis запущен
-python manage.py runserver
+### Настройка через `.env`
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USE_TLS=1
+SMTP_DEFAULT_USER=your_account@gmail.com
+SMTP_DEFAULT_PASSWORD=your_app_password
+DEFAULT_FROM_EMAIL=your_account@gmail.com
+```
+### Разово через HTML-страницу
+На форме отправки уведомления есть поля `smtp_user` и `smtp_password`.  
+Если их заполнить, они будут использованы только для этой отправки.
+Пример (демо-страница):
+![alt text](cash/image.png)
+![alt text](cash/image2.png)
+Пример (API):
+```
+# создать пользователя
+curl -X POST http://127.0.0.1:8000/api/users/ \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com"}'
+
+# поставить уведомление в очередь
+curl -X POST http://127.0.0.1:8000/api/notifications/ \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": 1, "message": "Hello via SMTP!"}'
+```
+### Отправка через Telegram-бота
+Реализована отправка сообщений через Telegram Bot API.
+Пользователь обязан сначала активировать чат с ботом (нажать **Start** или написать сообщение), иначе доставка невозможна.
+Настройка через `.env`
+```env
+TELEGRAM_BOT_TOKEN=1234567890:AA...your-bot-token...
+TELEGRAM_PARSE_MODE=HTML
+TELEGRAM_DISABLE_WPP=1
+TELEGRAM_TIMEOUT=10
+```
+Пример (демо-страница):
+![alt text](cash/image3.png)
+![alt text](cash/image4.png)

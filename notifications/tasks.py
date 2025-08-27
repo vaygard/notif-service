@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Optional
 
 from celery import shared_task
 from django.db import transaction
@@ -17,25 +18,35 @@ logger = logging.getLogger(__name__)
     retry_backoff=True,
     max_retries=3,
 )
-def send_notification_task(self, notif_id: int) -> None:
-    """Задача Celery: взять уведомление из БД и попытаться доставить.
-
-    Если доставка не удалась — задача будет ретраиться.
-    """
+def send_notification_task(
+    self,
+    notif_id: int,
+    smtp_user: Optional[str] = None,
+    smtp_password: Optional[str] = None,) -> None:
+ 
     with transaction.atomic():
         notif = Notification.objects.select_for_update().get(pk=notif_id)
-        method = try_deliver(notif.user, notif.message)
+
+        user = notif.user
+        if smtp_user:
+            user.smtp_user = smtp_user
+        if smtp_password:
+            user.smtp_password = smtp_password
+
+        method = try_deliver(user, notif.message)
         notif.attempts += 1
 
         if method:
             notif.delivered = True
             notif.delivery_method = method
 
-        notif.save(update_fields=["delivered", "delivery_method", "attempts"])
+        notif.save(
+            update_fields=["delivered", "delivery_method", "attempts"],
+        )
 
         if not notif.delivered:
             logger.warning(
-                "Notification %s not delivered, raising to trigger retry", notif_id
+                "Notification %s not delivered; triggering retry", notif_id
             )
             raise RuntimeError("Отправка не получилась, ретрай")
 

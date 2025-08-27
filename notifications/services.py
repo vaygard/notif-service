@@ -2,86 +2,84 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import List, Optional
-
-from django.conf import settings
-from django.core.mail import send_mail
+from typing import Iterable, List, Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
 
 class Sender(ABC):
-    """Базовый интерфейс для отправки сообщений."""
-    name: str
+    """
+    Базовый интерфейс транспорта доставки.
+    Реализации должны задать уникальное имя и опциональный приоритет.
+    """
+    name: str = "sender"
+    priority: int = 100  # ниже — выше в цепочке
 
     @abstractmethod
     def deliver(self, user: object, message: str) -> bool:
-        """Попытаться доставить сообщение пользователю. Вернуть True при успехе."""
+        """Пытается доставить сообщение. True при успехе, иначе False."""
         raise NotImplementedError
 
 
-class EmailSender(Sender):
-    name = "email"
-
-    def deliver(self, user: object, message: str) -> bool:
-        email = getattr(user, "email", None)
-        if not email:
-            return False
-        from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None)
-        try:
-            send_mail("Notification", message, from_email, [email])
-            return True
-        except Exception as exc:
-            logger.exception("Ошибка при отправке email пользователю %s", getattr(user, "pk", repr(user)))
-            # при необходимости можно логировать exc отдельно
-            return False
-
-
-class SmsSender(Sender):
-    name = "sms"
-
-    def deliver(self, user: object, message: str) -> bool:
-        phone = getattr(user, "phone", None)
-        if not phone:
-            return False
-        # Здесь заменить на реальный SDK/HTTP-клиент в проде
-        logger.info("[SMS] to %s: %s", phone, message)
-        return True
-
-
-class TelegramSender(Sender):
-    name = "telegram"
-
-    def deliver(self, user: object, message: str) -> bool:
-        tg_id = getattr(user, "telegram_id", None)
-        if not tg_id:
-            return False
-        # В проде — использовать Bot API
-        logger.info("[TG] to %s: %s", tg_id, message)
-        return True
-
-
 class DeliveryChainManager:
-    """Попытка отправки по цепочке: возвращает имя первого успешного send'а или None."""
-    def __init__(self, senders: List[Sender]) -> None:
-        self.senders = list(senders)
+    """
+    Идёт по цепочке отправщиков (в порядке приоритета) и пытается доставить.
+    Возвращает имя первого успешного отправщика или None.
+    """
+
+    def __init__(self, senders: Iterable[Sender]) -> None:
+        self._senders: List[Sender] = sorted(
+            list(senders),
+            key=lambda s: getattr(s, "priority", 100),
+        )
+
+    @property
+    def senders(self) -> Sequence[Sender]:
+        return tuple(self._senders)
 
     def try_deliver(self, user: object, message: str) -> Optional[str]:
-        for sender in self.senders:
+        for sender in self._senders:
             try:
                 if sender.deliver(user, message):
                     return sender.name
             except Exception:
-                logger.exception("Ошибка доставки в %s", getattr(sender, "name", repr(sender)))
+                logger.exception(
+                    "Ошибка доставки в %s",
+                    getattr(sender, "name", sender.__class__.__name__),
+                )
         return None
 
+    def add_sender(self, sender: Sender) -> None:
+        """Позволяет динамически расширять цепочку (например, в тестах)."""
+        self._senders.append(sender)
+        self._senders.sort(key=lambda s: getattr(s, "priority", 100))
 
-# По умолчанию: email -> sms -> telegram
-DEFAULT_MANAGER: DeliveryChainManager = DeliveryChainManager(
-    [EmailSender(), SmsSender(), TelegramSender()]
-)
+
+_manager: Optional[DeliveryChainManager] = None
+
+
+def get_default_manager() -> DeliveryChainManager:
+    """
+    Email ставим раньше Telegram, но это можно переопределить через приоритеты.
+    """
+    global _manager
+    if _manager is None:
+        from .senders.email import EmailSender
+        from .senders.telegram import TelegramSender
+
+        # можно подключить SMS, Push и т.д., просто добавив сюда
+        _manager = DeliveryChainManager(
+            [
+                EmailSender(),     # priority по умолчанию у классов отправки
+                TelegramSender(),
+            ]
+        )
+    return _manager
 
 
 def try_deliver(user: object, message: str) -> Optional[str]:
-    """Публичный API — возвращает имя способа доставки или None."""
-    return DEFAULT_MANAGER.try_deliver(user, message)
+    """
+    Удобный фасад: попробует доставить через стандартный менеджер
+    и вернёт имя канала-успешника или None.
+    """
+    return get_default_manager().try_deliver(user, message)

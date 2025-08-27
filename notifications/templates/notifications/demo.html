@@ -51,13 +51,26 @@
     </form>
 
     <!-- Форма отправки уведомления -->
-    <form method="post" action="{% url 'send-notification' %}">
+    <form method="post" action="{% url 'send_notification' %}">
       {% csrf_token %}
       <h2>2) Отправить уведомление</h2>
       <label>ID пользователя</label>
       <input type="number" name="user_id" placeholder="например, 1" required />
       <label>Сообщение</label>
       <textarea name="message" rows="5" placeholder="Текст уведомления..." required></textarea>
+
+      <!-- Поле: email для входа (опционально) -->
+      <div>
+        <label for="smtp_user">SMTP email (опционально)</label>
+        <input id="smtp_user" name="smtp_user" type="email" placeholder="your@email.com" />
+      </div>
+
+      <!-- Поле: app-password (опционально) -->
+      <div>
+        <label for="smtp_password">SMTP app-password (опционально)</label>
+        <input id="smtp_password" name="smtp_password" type="password" autocomplete="one-time-code" />
+      </div>
+
       <button type="submit">Отправить</button>
       <p><small>После отправки обнови страницу — ниже появится запись в таблице уведомлений.</small></p>
     </form>
@@ -99,6 +112,16 @@
       {% empty %}
         <tr><td colspan="7">Пока нет уведомлений.</td></tr>
       {% endfor %}
+      {% if messages %}
+        <ul class="messages" style="list-style: none; padding: 0;">
+          {% for m in messages %}
+            <li class="message {{ m.tags }}" style="margin: 6px 0; padding: 8px; border: 1px solid #ddd;">
+              {{ m }}
+            </li>
+          {% endfor %}
+        </ul>
+      
+{% endif %}
     </tbody>
   </table>
 

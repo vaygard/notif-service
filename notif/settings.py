@@ -143,5 +143,17 @@ USE_TZ = True
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Статика (для админки)
 STATIC_URL = "/static/"
+
+# SMTP defaults (используются если не переданы учётные данные при отправке)
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "1") == "1"
+
+# Опционально можно задать один общий аккаунт через .env
+SMTP_DEFAULT_USER = os.getenv("SMTP_DEFAULT_USER", "")
+SMTP_DEFAULT_PASSWORD = os.getenv("SMTP_DEFAULT_PASSWORD", "")
+
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_PARSE_MODE = os.getenv("TELEGRAM_PARSE_MODE", "")
